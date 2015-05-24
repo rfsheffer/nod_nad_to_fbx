@@ -209,8 +209,12 @@ class NodFile:
             # Init the required number of control points (verticies)
             new_mesh.InitControlPoints(group.num_verticies)
 
+            # Add all the verticies for this group
+            for i in range(0, group.num_verticies):
+                vertex = self.verticies[cur_vertex + i]
+                new_mesh.SetControlPointAt(fbx.FbxVector4(vertex.pos[0], vertex.pos[1], vertex.pos[2]), i)
+
             cur_poly = 0
-            cur_point = 0
             for i in range(cur_face, cur_face + group.num_faces):
 
                 new_mesh.BeginPolygon(cur_poly)
@@ -218,11 +222,8 @@ class NodFile:
                 # set all the face control points and triangle polygons
                 face = self.faces[i]
                 for j in range(0, 3):
-                    vertex = self.verticies[cur_vertex + face.indicies[j]]
-                    new_mesh.SetControlPointAt(fbx.FbxVector4(vertex.pos[0], vertex.pos[1], vertex.pos[2]), cur_point + j)
-                    new_mesh.AddPolygon(cur_point + j)
+                    new_mesh.AddPolygon(face.indicies[j])
 
-                cur_point += 3
                 cur_poly += 1
                 new_mesh.EndPolygon()
 
