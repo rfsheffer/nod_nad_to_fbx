@@ -1,5 +1,6 @@
 __author__ = 'rsheffer'
 
+import os
 import optparse
 from nod_file import *
 from nad_file import *
@@ -23,11 +24,15 @@ def main():
         argParser.print_help()
         quit()
 
+    fbx_name = os.path.basename(options.input)
+    fbx_name = fbx_name.split('.')[0] + '.fbx'
+
     if '.nod' in options.input:
         nod = NodFile()
         nod.open_nod(options.input)
+        nod.export_fbx(os.path.join(options.output, fbx_name))
     elif '.nad' in options.input:
-        pass
+        print('NAD not supported yet!')
     else:
         raise Exception('bad input file!')
 
