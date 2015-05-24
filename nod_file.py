@@ -214,18 +214,38 @@ class NodFile:
                 vertex = self.verticies[cur_vertex + i]
                 new_mesh.SetControlPointAt(fbx.FbxVector4(vertex.pos[0], vertex.pos[1], vertex.pos[2]), i)
 
+            # Setup the indicies (the connections between verticies) per polygon
             cur_poly = 0
             for i in range(cur_face, cur_face + group.num_faces):
 
                 new_mesh.BeginPolygon(cur_poly)
 
-                # set all the face control points and triangle polygons
                 face = self.faces[i]
                 for j in range(0, 3):
                     new_mesh.AddPolygon(face.indicies[j])
 
                 cur_poly += 1
                 new_mesh.EndPolygon()
+
+            # Create the layer to store UV and normal data
+            layer = new_mesh.GetLayer(0)
+            if not layer:
+                new_mesh.CreateLayer()
+                layer = new_mesh.GetLayer(0)
+
+            # specify normals per control point.
+            # For compatibility, we follow the rules stated in the
+            # layer class documentation: normals are defined on layer 0 and
+            # are assigned by control point.
+            normLayer = fbx.FbxLayerElementNormal.Create(new_mesh, "")
+            normLayer.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+            normLayer.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+
+            for i in range(0, group.num_verticies):
+                vertex = self.verticies[cur_vertex + i]
+                normLayer.GetDirectArray().Add(fbx.FbxVector4(vertex.norm[0], vertex.norm[1], vertex.norm[2], 1.0))
+
+            layer.SetNormals(normLayer)
 
             # move to next group and its faces
             group_num += 1

@@ -6,6 +6,9 @@ project is to allow users to mess around with the VtMR content in their own sand
 also be used to create Blender plugins for import and export of VtMR models and animations back to the NOD engine, but that
 is beyond the scope of this project, maybe for another project if the interest in that spikes.
 
+## Current output:
+![alt tag](http://s18.postimg.org/vf0842co9/vamp_model.png)
+
 ## Current Features:
 - Exports the NOD vertex data to FBX
 
