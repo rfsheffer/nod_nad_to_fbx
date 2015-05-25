@@ -193,6 +193,7 @@ class NodFile:
         vamp_node = fbx.FbxNode.Create(fbx_scene, 'vampNode')
         root_node.AddChild(vamp_node)
 
+        material_list = {}  # Gets populated as textures are needed. Contains a (material, texture) tupple per key
         cur_face = 0
         cur_vertex = 0
         group_num = 0
@@ -205,6 +206,7 @@ class NodFile:
             # Create a new mesh node attribute in the scene, and set it as the new node's attribute
             new_mesh = fbx.FbxMesh.Create(fbx_scene, '{0}Mesh{1}'.format(mesh_name, group_num))
             new_node.SetNodeAttribute(new_mesh)
+            new_node.SetShadingMode(fbx.FbxNode.eTextureShading)
 
             # Init the required number of control points (verticies)
             new_mesh.InitControlPoints(group.num_verticies)
@@ -214,30 +216,37 @@ class NodFile:
                 vertex = self.verticies[cur_vertex + i]
                 new_mesh.SetControlPointAt(fbx.FbxVector4(vertex.pos[0], vertex.pos[1], vertex.pos[2]), i)
 
-            # Setup the indicies (the connections between verticies) per polygon
-            cur_poly = 0
-            for i in range(cur_face, cur_face + group.num_faces):
-
-                new_mesh.BeginPolygon(cur_poly)
-
-                face = self.faces[i]
-                for j in range(0, 3):
-                    new_mesh.AddPolygon(face.indicies[j])
-
-                cur_poly += 1
-                new_mesh.EndPolygon()
-
             # Create the layer to store UV and normal data
             layer = new_mesh.GetLayer(0)
             if not layer:
                 new_mesh.CreateLayer()
                 layer = new_mesh.GetLayer(0)
 
+            # Create the materials.
+            # Each polygon face will be assigned a unique material.
+            matLayer = fbx.FbxLayerElementMaterial.Create(new_mesh, "")
+            matLayer.SetMappingMode(fbx.FbxLayerElement.eByPolygon)
+            matLayer.SetReferenceMode(fbx.FbxLayerElement.eIndexToDirect)
+            layer.SetMaterials(matLayer)
+
+            # Setup the indicies (the connections between verticies) per polygon
+            cur_poly = 0
+            for i in range(0, group.num_faces):
+
+                new_mesh.BeginPolygon(cur_poly)
+
+                face = self.faces[cur_face + i]
+                for j in range(0, 3):
+                    new_mesh.AddPolygon(face.indicies[j])
+
+                cur_poly += 1
+                new_mesh.EndPolygon()
+
             # specify normals per control point.
             # For compatibility, we follow the rules stated in the
             # layer class documentation: normals are defined on layer 0 and
             # are assigned by control point.
-            normLayer = fbx.FbxLayerElementNormal.Create(new_mesh, "")
+            normLayer = fbx.FbxLayerElementNormal.Create(new_mesh, '')
             normLayer.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
             normLayer.SetReferenceMode(fbx.FbxLayerElement.eDirect)
 
@@ -246,6 +255,86 @@ class NodFile:
                 normLayer.GetDirectArray().Add(fbx.FbxVector4(vertex.norm[0], vertex.norm[1], vertex.norm[2], 1.0))
 
             layer.SetNormals(normLayer)
+
+            # Create color vertices
+            '''vtxcLayer = fbx.FbxLayerElementVertexColor.Create(new_mesh, '')
+            vtxcLayer.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+            vtxcLayer.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+
+            for i in range(0, group.num_verticies):
+                vtxcLayer.GetDirectArray().Add(fbx.FbxColor(1.0, 1.0, 1.0, 1.0))
+
+            layer.SetVertexColors(vtxcLayer)'''
+
+            # create polygroups.
+            # We are going to make a first group with the 4 sides.
+            # And a second group with the top and bottom sides.
+            # NOTE that the only reference mode allowed is eINDEX
+            '''pgrpLayer = fbx.FbxLayerElementPolygonGroup.Create(new_mesh, '')
+            pgrpLayer.SetMappingMode(fbx.FbxLayerElement.eByPolygon)
+            pgrpLayer.SetReferenceMode(fbx.FbxLayerElement.eIndex)
+            for i in range(0, group.num_faces):
+                pgrpLayer.GetIndexArray().Add(0)
+
+            layer.SetPolygonGroups(pgrpLayer)'''
+
+
+            # create the UV textures mapping.
+            # On layer 0 all the faces have the same texture
+            uvLayer = fbx.FbxLayerElementUV.Create(new_mesh, '')
+            uvLayer.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+            uvLayer.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+
+            # For all the verticies, set the UVs
+            for i in range(0, group.num_verticies):
+                vertex = self.verticies[cur_vertex + i]
+                uvLayer.GetDirectArray().Add(fbx.FbxVector2(vertex.uv[0], vertex.uv[1]))
+
+            layer.SetUVs(uvLayer)
+
+            # Set textures
+            if group.material_id != -1:
+                texture_name = self.materials[group.material_id]
+
+                # Create texture if nessesary
+                if texture_name not in material_list:
+                    texture = create_texture(fbx_manager, texture_name, texture_name + '.tga')
+
+                    # We also need a material, create that now
+                    material_name = fbx.FbxString(texture_name)
+
+                    material = fbx.FbxSurfacePhong.Create(fbx_manager, material_name.Buffer())
+
+                    # Generate primary and secondary colors.
+                    material.Emissive.Set(fbx.FbxDouble3(0.0, 0.0, 0.0))
+                    material.Ambient.Set(fbx.FbxDouble3(1.0, 1.0, 1.0))
+                    material.Diffuse.Set(fbx.FbxDouble3(1.0, 1.0, 1.0))
+                    material.Specular.Set(fbx.FbxDouble3(0.0, 0.0, 0.0))
+                    material.TransparencyFactor.Set(0.0)
+                    material.Shininess.Set(0.5)
+                    material.ShadingModel.Set(fbx.FbxString("phong"))
+
+                    material_info = (material, texture)
+                    material_list[texture_name] = material_info
+
+                else:
+                    material_info = material_list[texture_name]
+
+                texLayer = fbx.FbxLayerElementTexture.Create(new_mesh, '')
+                texLayer.SetBlendMode(fbx.FbxLayerElementTexture.eModulate)
+                texLayer.SetMappingMode(fbx.FbxLayerElement.eByPolygon)
+                texLayer.SetReferenceMode(fbx.FbxLayerElement.eIndexToDirect)
+                texLayer.GetDirectArray().Add(material_info[1])
+
+                # set all faces to that texture
+                for i in range(0, group.num_faces):
+                    texLayer.GetIndexArray().Add(0)
+
+                layer.SetTextures(fbx.FbxLayerElement.eTextureDiffuse, texLayer)
+
+                lMeshNode = new_mesh.GetNode()
+                if lMeshNode:
+                    lMeshNode.AddMaterial(material_info[0])
 
             # move to next group and its faces
             group_num += 1

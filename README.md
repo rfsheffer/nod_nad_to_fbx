@@ -7,14 +7,14 @@ also be used to create Blender plugins for import and export of VtMR models and 
 is beyond the scope of this project, maybe for another project if the interest in that spikes.
 
 ## Current output:
-![alt tag](http://s18.postimg.org/vf0842co9/vamp_model.png)
+![alt tag](http://s30.postimg.org/8x5v8ymgx/vamp_model.png)
 
 ## Current Features:
 - Exports the NOD vertex data to FBX
-
-## Road map:
-- Exports the NOD vertex data to FBX (DONE)
 - Export normals and UV information for the vertex data
+
+## TODO:
+- Allow automatic import of materials to be included inside the fbx
 - Export the skeleton
 - Skin the vertex data to the skeleton using weights
 - Import animation curve data from the NAD files

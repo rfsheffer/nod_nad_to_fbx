@@ -2,6 +2,37 @@ __author__ = 'rsheffer'
 
 import fbx
 
+def create_texture(sdk_manager, name, filename):
+    l_texture = fbx.FbxFileTexture.Create(sdk_manager, name)
+    l_texture.SetFileName(filename)
+    l_texture.SetTextureUse(fbx.FbxTexture.eStandard)
+    l_texture.SetMappingType(fbx.FbxTexture.eUV)
+    l_texture.SetMaterialUse(fbx.FbxFileTexture.eModelMaterial)
+    l_texture.SetSwapUV(False)
+    l_texture.SetTranslation(0.0, 0.0)
+    l_texture.SetScale(1.0, 1.0)
+    l_texture.SetRotation(0.0, 0.0)
+    return l_texture
+
+def create_material(sdk_manager):
+    lMaterialName = "material"
+    lShadingName = "Phong"
+    fbx.FbxDouble3(0.0, 0.0, 0.0)
+    lBlack = fbx.FbxDouble3(0.0, 0.0, 0.0)
+    lRed = fbx.FbxDouble3(1.0, 0.0, 0.0)
+    lDiffuseColor = fbx.FbxDouble3(0.75, 0.75, 0.0)
+    gMaterial = fbx.FbxSurfacePhong.Create(sdk_manager, lMaterialName)
+
+    # Generate primary and secondary colors.
+    '''gMaterial.Emissive
+    gMaterial.GetEmissiveColor()      .Set(lBlack)
+    gMaterial.GetAmbientColor()       .Set(lRed)
+    gMaterial.GetDiffuseColor()       .Set(lDiffuseColor)
+    gMaterial.GetTransparencyFactor() .Set(40.5)
+    gMaterial.GetShadingModel()       .Set(lShadingName)
+    gMaterial.GetShininess()          .Set(0.5)'''
+    return gMaterial
+
 def save_scene(filename, fbx_manager, fbx_scene, as_ascii=False):
     """ Save the scene using the Python FBX API """
     exporter = fbx.FbxExporter.Create(fbx_manager, '')
