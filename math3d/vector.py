@@ -155,3 +155,8 @@ def VectorCopy(a, b):
     b[0] = a[0]
     b[1] = a[1]
     b[2] = a[2]
+
+def VectorLerp(v1, v2, t, out):
+    out[0] = v1[0] + (v2[0] - v1[0]) * t
+    out[1] = v1[1] + (v2[1] - v1[1]) * t
+    out[2] = v1[2] + (v2[2] - v1[2]) * t
