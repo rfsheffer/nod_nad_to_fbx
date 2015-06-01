@@ -1,5 +1,6 @@
-__author__ = 'rsheffer'
+__author__ = 'rfsheffer'
 
+import os
 from math3d.vector import *
 from file_reader import *
 import fbx
@@ -17,14 +18,19 @@ class NodBone:
         for i in range(0, 3):
             self.rest_translate[i] = read_float(fp)
 
-        for i in range(0, 3):
-            row = self.rest_matrix_inverse[i]
-            for j in range(0, 4):
-                row[j] = read_float(fp)
+        for i in range(0, 4):  # column
+            for j in range(0, 3):  # row
+                self.rest_matrix_inverse[j][i] = read_float(fp)
 
         self.sibling_id = read_short(fp)
         self.child_id = read_short(fp)
         self.parent_id = read_short(fp)
+        '''print('bone {0}, {1}, {2}            sib:{3}    child:{4}    parent:{5}'.format(self.rest_translate[0],
+                                                                                self.rest_translate[1],
+                                                                                self.rest_translate[2],
+                                                                                self.sibling_id,
+                                                                                self.child_id,
+                                                                                self.parent_id))'''
 
 
 class NodVertex:
@@ -188,10 +194,43 @@ class NodFile:
         fbx_manager = fbx.FbxManager.Create()
         fbx_scene = fbx.FbxScene.Create(fbx_manager, '')
 
+        scene_info = fbx.FbxDocumentInfo.Create(fbx_manager, "SceneInfo")
+        scene_info.mTitle = os.path.basename(out_name)
+        scene_info.mSubject = "Nihilistic NOD model output to FBX"
+        scene_info.mAuthor = "Nihilistic"
+        scene_info.mRevision = "rev. 1.0"
+        scene_info.mKeywords = os.path.basename(out_name)
+        scene_info.mComment = "n/a"
+        fbx_scene.SetSceneInfo(scene_info)
+
         root_node = fbx_scene.GetRootNode()
 
-        vamp_node = fbx.FbxNode.Create(fbx_scene, 'vampNode')
+        vamp_node = fbx.FbxNode.Create(fbx_scene, os.path.basename(out_name))
         root_node.AddChild(vamp_node)
+
+        # Now create the skeleton
+        skel_bones = []
+        for i in range(0, len(self.bones)):
+            bone = self.bones[i]
+
+            is_root = bone.sibling_id == -1 and bone.parent_id == -1
+
+            bone_name = 'root' if is_root else 'bone{0}'.format(i - 1)
+            skeleton_root_attridute = fbx.FbxSkeleton.Create(fbx_manager, bone_name)
+            skeleton_root_attridute.SetSkeletonType(fbx.FbxSkeleton.eRoot if is_root else fbx.FbxSkeleton.eLimbNode)
+            if not is_root:
+                skeleton_root_attridute.Size.Set(1.0)
+            skeleton_bone = fbx.FbxNode.Create(fbx_manager, bone_name)
+            skeleton_bone.SetNodeAttribute(skeleton_root_attridute)
+            skeleton_bone.LclTranslation.Set(fbx.FbxDouble3(bone.rest_translate[0],
+                                                            bone.rest_translate[1],
+                                                            bone.rest_translate[2]))
+            skel_bones.append(skeleton_bone)
+            if not is_root:
+                skel_bones[bone.parent_id].AddChild(skeleton_bone)
+
+        # Add the root bone to the scene hierarchy
+        vamp_node.AddChild(skel_bones[0])
 
         material_list = {}  # Gets populated as textures are needed. Contains a (material, texture) tupple per key
         cur_face = 0
@@ -211,10 +250,39 @@ class NodFile:
             # Init the required number of control points (verticies)
             new_mesh.InitControlPoints(group.num_verticies)
 
+            # Clusters are verticies which are influenced by a bone.
+            group_clusters = {}
+
             # Add all the verticies for this group
             for i in range(0, group.num_verticies):
                 vertex = self.verticies[cur_vertex + i]
                 new_mesh.SetControlPointAt(fbx.FbxVector4(vertex.pos[0], vertex.pos[1], vertex.pos[2]), i)
+                # Create a cluster for each bone (verticies influenced by the bone)
+                if vertex.bone_num not in group_clusters:
+                    cluster = fbx.FbxCluster.Create(fbx_manager, '')
+                    cluster.SetLink(skel_bones[vertex.bone_num])
+                    cluster.SetLinkMode(fbx.FbxCluster.eTotalOne) # weights should add up to 1
+                    group_clusters[vertex.bone_num] = cluster
+                group_clusters[vertex.bone_num].AddControlPointIndex(i, vertex.weight)
+
+
+            # Get the global node transform to apply to the clusters
+            lScene = new_node.GetScene()
+            lXMatrix = lScene.GetAnimationEvaluator().GetNodeGlobalTransform(new_node)
+
+            # Create a skin deformer and assign all of the clusters
+            skin_mod = fbx.FbxSkin.Create(fbx_manager, '')
+            for bone_index, cluster in group_clusters.iteritems():
+                cluster.SetTransformMatrix(lXMatrix)
+
+                # Apply the skeleton bone global transform as the clusters link matrix
+                skel_bone_matrix = lScene.GetAnimationEvaluator().GetNodeGlobalTransform(skel_bones[bone_index])
+                cluster.SetTransformLinkMatrix(skel_bone_matrix)
+
+                skin_mod.AddCluster(cluster)
+
+            # Add the skin deformer to the mesh
+            new_mesh.AddDeformer(skin_mod)
 
             # Create the layer to store UV and normal data
             layer = new_mesh.GetLayer(0)

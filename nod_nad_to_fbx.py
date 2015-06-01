@@ -1,4 +1,4 @@
-__author__ = 'rsheffer'
+__author__ = 'rfsheffer'
 
 import os
 import optparse

@@ -77,8 +77,8 @@ class NadFile:
 
     def open_nad(self, file_name):
         """
-        Imports the NODs data into the structure
-        :param file_name: The model file to import from
+        Imports the NADs data into the structure
+        :param file_name: The animation nad file to import from
         """
         fp = open(file_name)
         if not fp:
@@ -104,6 +104,8 @@ class NadFile:
             key_tag = KeyframeTag()
             key_tag.read_keytag(fp)
             self.tags.append(key_tag)
+
+        fp.close()
 
     def export_fbx(self):
         pass
